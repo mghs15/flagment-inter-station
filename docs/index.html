@@ -390,22 +390,27 @@ inputSetting.forEach( s => {
 
 
 //Sourceの数だけチェックボックスを作る。
-for( source in overlayStyle.sources){
+const appendOverlayCheckbox = (sourceId, titleText) => {
   const formAreaSelectOverlay = document.getElementById("selectOverlay");
   
   const input = document.createElement("input");
   input.setAttribute("name", "selectOverlayCheck");
   input.setAttribute("type", "checkbox");
   input.setAttribute("checked", "checked");
-  input.setAttribute("value", source);
-  input.addEventListener("change", () => {selectOverlayLaers();} );
+  input.setAttribute("value", sourceId);
+  input.addEventListener("change", () => {selectOverlayLayers();} );
   formAreaSelectOverlay.appendChild(input);  
   
   const title = document.createElement("span");
   // 本来、source には metadata を記載できないため、以下の処理を修正
-  title.innerText = overlayStyle.sources[source].metadata ? 
-    overlayStyle.sources[source].metadata.title : overlayStyle.metadata.source[source].title;
+  title.innerText = titleText;
   formAreaSelectOverlay.appendChild(title);
+}
+
+for( source in overlayStyle.sources){
+  const titleText = overlayStyle.sources[source].metadata ? 
+    overlayStyle.sources[source].metadata.title : overlayStyle.metadata.source[source].title;
+  appendOverlayCheckbox(source, titleText);
 }
 
 /*************************************************/
@@ -565,7 +570,7 @@ const changeAllStyleFilters = () =>{
 }
 
 
-const selectOverlayLaers = () => {
+const selectOverlayLayers = () => {
   //ソースごとの表示ON・OFF
   const checkList = document.getElementsByName("selectOverlayCheck");
   const checkedList = [];
@@ -1091,6 +1096,13 @@ const renderFromList = (list) => {
   
   // 上乗せデータと同様の設定
   if(!overlayInfo.overlayKeyNames["added-geojson"]){
+    
+    // チェックボックスの生成
+    const sourceId = "added-geojson";
+    const titleText = "アップロードデータ";
+    appendOverlayCheckbox(sourceId, titleText);
+    
+    // 管理用配列へ追加
     overlayInfo.overlayKeyNames["added-geojson"] = "---";
     overlayInfo.overlaySourceIdList.push("added-geojson");
     overlayInfo.overlayMainLayerIdList.push("added-geojson");
