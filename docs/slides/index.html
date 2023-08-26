@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8' />
+<title>ハザード付き路線図（複数ハザード）</title>
+<meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<style>
+body { margin:0; padding:0;}
+
+#note {
+  margin: 1em;
+}
+
+h1 {
+  font-size: 1.5em;
+  
+}
+
+.strong {
+  color: red;
+}
+
+
+.strong.box {
+  display: block;
+  border: 2px solid red;
+  padding: 8px;
+}
+
+
+#main {
+  margin: 1em;
+}
+
+#question {
+  margin: 1em;
+}
+
+.slide {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-row: auto 1fr auto;
+  border: solid 1px rgb(0,0,100);
+  margin-bottom: 1em;
+}
+
+.title {
+  background-color: rgb(0,0,100);
+  color: rgb(255,255,255);
+  text-align: center;
+}
+
+.contents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 60px);
+  row-gap: 1em;
+  padding: 1em;
+  border-bottom: 1px solid #DDDDDD;
+}
+
+.footer { 
+  padding: 0.25em;
+  text-align: right;
+}
+
+.set {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.interval {
+  display: inline-block;
+  background-color: rgb(0,0,100);
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.station {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 15px 15px 15px auto;
+  row-gap: 2px;
+  border-radius: 4px;
+  border: solid 1px rgb(0,0,100);
+  height: 100%;
+  cursor: pointer;
+  padding: 2px;
+}
+
+
+.hazard {
+  border: solid 1px rgb(0,0,100);
+}
+
+.station-name {
+  display: inline-block;
+  writing-mode: vertical-rl;
+}
+
+</style>
+<body>
+
+
+
+<div id='note'>
+<h1 id='page-title'>全国版 ハザード付き路線図</h1>
+<strong class='strong box'>本サイトのハザード情報はあくまで目安であり、実際のリスクは各自治体のハザードマップ等を確認してください。また、単純にデータが未整備の場合や、誤りが含まれる可能性もあります。</strong>
+<br>
+本サイトは、鉄道駅のデータ（<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank">国土数値情報（令和4年度）</a>）から生成した代表点におけるハザード情報（<a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank">重ねるハザードマップ</a>）に応じて色分けしたものです。
+<ul>
+<li>対象とした重ねるハザードマップのデータは、洪水浸水想定区域（想定最大規模）、高潮浸水想定区域、津波浸水想定です。</li>
+<li>駅の構造や構造物の高さ、周辺の状況は考慮していません。</li>
+<li>路線ごとの駅の順番は、国土数値情報や Wikipedia の情報をもとに生成しています。</li>
+<li>各駅をクリックすると、重ねるハザードマップへ移動します。</li>
+</ul>
+</div>
+
+<div id='question'></div>
+<div id='main'></div>
+
+<script>
+
+const loadJSON = function(path){
+  
+  let data;
+  
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', path, false);
+  xhr.send(null);
+  
+  if(xhr.status == 200 || xhr.status == 304){
+    data = JSON.parse(xhr.responseText);
+  }
+  
+  return data;
+}
+
+const getQueryParams = () => {
+  const q = window.location.search;
+  const qq = q.slice(1);
+  const qset = qq.split("&");
+  const qobj = {};
+  qset.forEach( c => {
+    const cc = c.split("=");
+    qobj[cc[0]] = cc[1];
+  });
+  return qobj;
+}
+
+const createSelector = s => {
+
+  const formArea = document.getElementById("question");
+  
+  const select = document.createElement("select");
+  select.setAttribute("id", s.id);
+  select.setAttribute("name", s.id);
+  
+  for(name in s.list){
+    const option = document.createElement("option");
+    option.setAttribute("value", s.list[name]);
+    option.innerText = name;
+    select.appendChild(option);
+  }
+  
+  select.addEventListener("change", () => {refleshAll();} );
+  formArea.appendChild(select);  
+
+}
+
+const goToHazardMap = (lng, lat, hazard) => {
+  if( !lng || !lat){
+    alert("駅情報が不足しています。")
+  }else{
+    let params = "";
+    if(hazard == "flood"){
+      params = "base=pale&ls=seamless%7Cflood_l2_keizoku%2C0.8%7Cflood_list%2C0.8%7Cflood_l1%2C0.8%7Cflood_list_l2%2C0.75%7Cdisaster1&disp=000010&vs=c1j0l0u0t0h0z0";
+    }else if(hazard == "hightide"){
+      params = "base=pale&ls=takashio_sinsuisin_raster%2C0.8%7Cdisaster3&disp=10&vs=c1j0l0u0t0h0z0";
+    }else if(hazard == "tsunami"){
+      params = "base=pale&ls=seamless%7Cekijouka_zenkoku%2C0.8%7Ctsunamishinsui_raster%2C0.8%7Cdisaster5&disp=0010&vs=c1j0l0u0t0h0z0";
+    }
+    
+    const url = `https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=${lat},${lng}&z=15&${params}`;
+    window.open(url, '_blank');
+  }
+}
+
+const queries = getQueryParams();
+
+const json = loadJSON(`./station-with-hazard.json`);
+
+// セレクタ生成
+
+const selecter = {
+  "id": "selecter",
+  "type": "select",
+  "title": "選択肢",
+  "list": {
+    "（鉄道事業者を選択）": ""
+  }
+};
+
+const companyKeys = Object.keys(json);
+const companyList = [];
+
+companyKeys.forEach( company => {
+  let companyName = company.match("旅客鉄道") ?
+    "[JR] " + company : company;
+  companyList.push(companyName);
+});
+
+companyList.sort((a, b) => {
+  return a.localeCompare(b, "ja");
+}).forEach( company => {
+  selecter.list[company] = company.replace("[JR] ", "");
+});
+
+/*
+for( company in json ){
+  selecter.list[company] = company;
+}
+*/
+
+createSelector(selecter);
+
+
+// 変換処理
+const toZenkaku = string => {
+  
+  let ss = string
+   .replace("1", "１").replace("2", "２").replace("3", "３")
+   .replace("4", "４").replace("5", "５").replace("6", "６")
+   .replace("7", "７").replace("8", "８").replace("9", "９")
+   .replace("0", "０");
+  
+  ss = ss
+   .replace("A", "Ａ").replace("B", "Ｂ").replace("C", "Ｃ")
+   .replace("D", "Ｄ").replace("E", "Ｅ").replace("F", "Ｆ")
+   .replace("G", "Ｇ").replace("H", "Ｈ").replace("I", "Ｉ")
+   .replace("J", "Ｊ").replace("K", "Ｋ").replace("L", "Ｌ")
+   .replace("M", "Ｍ").replace("N", "Ｎ").replace("O", "Ｏ")
+   .replace("P", "Ｐ").replace("Q", "Ｑ").replace("R", "Ｒ")
+   .replace("S", "Ｓ").replace("T", "Ｔ").replace("U", "Ｕ")
+   .replace("V", "Ｖ").replace("W", "Ｗ").replace("X", "Ｘ")
+   .replace("Y", "Ｙ").replace("Z", "Ｚ");
+  
+  return ss;
+  
+}
+
+const h = c => {
+  const cc = (c > 1) ? c : 255;
+  return cc;
+}
+      
+const refleshAll = () => {
+  
+  //好きな処理を入れる
+  
+  //選択肢の取得
+  const v = document.getElementById(selecter.id).value;
+  
+  const dataset = json[v];
+  
+  let mokuji = "<div id='mokuji'>";
+  let html = "";
+  
+  const lineKeys = Object.keys(dataset);
+  
+  lineKeys.sort( (a,b) => {
+    const ga = Math.max(
+      dataset[a][0].geometry.coordinates[1],
+      dataset[a][dataset[a].length -1].geometry.coordinates[1]
+    );
+    const gb = Math.max(
+      dataset[b][0].geometry.coordinates[1],
+      dataset[b][dataset[b].length -1].geometry.coordinates[1]
+    );
+    return gb - ga;
+  })
+  
+  lineKeys.forEach( line => {
+  
+    mokuji += `<a href="#${v}-${line}">${line}</a> `;
+    
+    const stations = dataset[line];
+    let item = `<div class='contents'>`;
+    
+    let isStart = true;
+    
+    stations.forEach( station => {
+      const p = station.properties;
+      
+      // 支線の分離
+      if(p.name == "_break_"){
+        item += `</div><div class='contents'>`;
+        isStart = true;
+        return;
+      }
+      
+      /* *************************** */
+      
+      item += `<div class='set'>`;
+      
+      // コネクタ
+      if(isStart){
+        item += `<div class='blank'></div>`;
+        isStart = !isStart;
+      }else{
+        item += `<div class='interval' style='height:10px;'></div>`;
+      }
+      
+      /*******
+      // 属性値に応じてコネクタを修飾する場合
+      if(p.capacity){
+        const width = p.capacity/10000;
+        item += `<div class='interval' style='height:${width}px;' title='${Math.floor(p.capacity/1000)/10}万人'></div>`;
+      }else{
+        item += `<div class='blank'></div>`;
+      }
+      *******/
+      
+      // ハザード
+      const lng = station.geometry ? station.geometry.coordinates[0] : 0;
+      const lat = station.geometry ? station.geometry.coordinates[1] : 0;
+      
+      let stationName = p.N02_005 || p.name;
+      // 縦書き時の表示のため、英数字を全角にする
+      stationName = toZenkaku(stationName);
+      
+      
+      item += `<div class='station'>
+        <div class='flood-risk hazard' title='洪水リスク' onclick='goToHazardMap(${lng},${lat},"flood");' 
+             style='background-color:rgb(${h(p["flood-r"])},${h(p["flood-g"])},${h(p["flood-b"])});'></div>
+        <div class='hightide-risk hazard' title='高潮リスク' onclick='goToHazardMap(${lng},${lat},"hightide");' 
+             style='background-color:rgb(${h(p["hightide-r"])},${h(p["hightide-g"])},${h(p["hightide-b"])});'></div>
+        <div class='tsunami-risk hazard' title='津波リスク' onclick='goToHazardMap(${lng},${lat},"tsunami");' 
+             style='background-color:rgb(${h(p["tsunami-r"])},${h(p["tsunami-b"])},${h(p["tsunami-b"])});'></div>
+        <div class='station-name' onclick='goToHazardMap(${lng},${lat});'>${stationName}</div>
+      </div>`;
+      
+      item += `</div>`; // div class:set
+      
+    });
+    
+    item += `</div>`; // div class:contents
+    
+    const slide = `<div class='slide'>
+      <div class='title' id='${v}-${line}'>${v} - ${line}</div>
+      <div class='slide-main'>${item}</div>
+      <div class='footer'><strong class='strong'>※対象は洪水、高潮、津波です。データが未整備等の場合もあります。
+        <br>ハザード情報はあくまで目安であり、実際のリスクは各自治体のハザードマップ等を確認してください。</strong></div>
+    </div>`;
+    html += slide;
+    
+  });
+  
+  mokuji += `</div>`;
+  document.getElementById("main").innerHTML = mokuji + html;
+}
+
+</script>
+
+</body>
+</html>
