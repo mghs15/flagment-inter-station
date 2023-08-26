@@ -131,6 +131,7 @@ h1 {
 <li>駅の構造や構造物の高さ、周辺の状況は考慮していません。</li>
 <li>路線ごとの駅の順番は、国土数値情報や Wikipedia の情報をもとに生成しています。</li>
 <li>各駅をクリックすると、重ねるハザードマップへ移動します。</li>
+<li>灰色は情報がないことを示します。</li>
 </ul>
 </div>
 
@@ -363,9 +364,12 @@ const refleshAll = () => {
       
       const rgb = {
         "none": `rgb(255,255,255)`,
-        "flood": `rgb(${h(p["flood-r"])},${h(p["flood-g"])},${h(p["flood-b"])})`,
-        "hightide": `rgb(${h(p["hightide-r"])},${h(p["hightide-g"])},${h(p["hightide-b"])})`,
-        "tsunami": `rgb(${h(p["tsunami-r"])},${h(p["tsunami-b"])},${h(p["tsunami-b"])})`
+        "flood": p["flood-rank"] ? 
+          `rgb(${h(p["flood-r"])},${h(p["flood-g"])},${h(p["flood-b"])})` : `rgb(199,199,199)`,
+        "hightide": p["hightide-rank"] ? 
+          `rgb(${h(p["hightide-r"])},${h(p["hightide-g"])},${h(p["hightide-b"])})` : `rgb(199,199,199)`,
+        "tsunami": p["tsunami-rank"] ? 
+          `rgb(${h(p["tsunami-r"])},${h(p["tsunami-b"])},${h(p["tsunami-b"])})` : `rgb(199,199,199)`
       };
       
       const mainHazardColor = rgb[mainHazardType];
