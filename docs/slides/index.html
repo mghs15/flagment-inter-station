@@ -2,149 +2,327 @@
 <html>
 <head>
 <meta charset='utf-8' />
-<title>ハザード付き路線図（複数ハザード）</title>
+<title>鉄道路線図（駅間データ）</title>
 <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<script src='https://unpkg.com/maplibre-gl@^2.4/dist/maplibre-gl.js'></script>
+<link href='https://unpkg.com/maplibre-gl@^2.4/dist/maplibre-gl.css' rel='stylesheet' />
+<script src="https://unpkg.com/pmtiles@2.5.0/dist/index.js"></script>
 <style>
 body { margin:0; padding:0;}
 
+
+#map {
+  position: absolute;
+  top: 0;
+  bottom: 40px;
+  width: 100%;
+}
+
+#menutop{
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+  z-index: 99999;
+  pointer-events: none;
+}
+
+#menu {
+  position: relative;
+  padding: 5px 20px ;
+  margin: 0 0;
+  background: #eeeeee;
+  box-shadow: 0px 0px 0px 0px #eeeeee;
+  font-family: 'Open Sans', sans-serif;
+  min-height: 30px;
+  //max-width: 350px;
+  pointer-events: auto;
+}
+
+button.local {
+  display: block;  
+  position: relative;
+  left: 0px;
+  right: 0px;
+  text-align: center;
+  background: #dddddd;
+  border: solid 2px #ddd;
+  border-radius: 4px;
+  width: 100%;
+  line-height: 1.5em;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+button.small {
+  text-align:center;
+  background: #dddddd;
+  padding: 0 0.5em 0 0.5em;
+  border: solid 2px #aaa;
+  border-radius: 4px;
+  margin: 2.5px 0px 2.5px 0px;
+  line-height: 1.5em;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+#slider_01 {
+  width: 100%;
+}
+
+#slider_02 {
+  width: 100%;
+}
+
 #note {
-  margin: 1em;
-}
-
-h1 {
-  font-size: 1.5em;
-  
-}
-
-.strong {
-  color: red;
+  position: relative;
+  color: #FF0000;
+  font-family: 'Open Sans', sans-serif;
+  font-weight: bold;
+  right: 0.5em;
+  text-align: right;
+  text-shadow: #FFFFFF 0.2em 0.2em 0.2em, #FFFFFF -0.2em 0.2em 0.2em, #FFFFFF 0.2em -0.2em 0.2em, #FFFFFF -0.2em -0.2em 0.2em;
 }
 
 
-.strong.box {
-  display: block;
-  border: 2px solid red;
-  padding: 8px;
-}
-
-
-#main {
-  margin: 1em;
-}
-
-#question {
-  margin: 1em;
-}
-
-.slide {
+#overlay-page {
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-row: auto 1fr auto;
-  border: solid 1px rgb(0,0,100);
-  margin-bottom: 1em;
+  grid-template-rows: 45px 1fr 45px;
+  grid-gap: 8px;
+  z-index: 100000;
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  margin: auto;
+  padding: 8px;
+  border-radius: 8px;
+  border: 2px solid #aaaaaa;
+  background-color: #eeeeee;
 }
 
-.title {
-  background-color: rgb(0,0,100);
-  color: rgb(255,255,255);
+#overlay-page-title {
+  font-weight: bold;
   text-align: center;
 }
 
-.contents {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 60px);
-  row-gap: 1em;
-  padding: 1em;
-  border-bottom: 1px solid #DDDDDD;
+#overlay-page-header {
+  border-bottom: 1px solid #aaaaaa;
+  padding: 8px;
 }
 
-.footer { 
-  padding: 0.25em;
-  text-align: right;
+#overlay-page-footer {
+  border-top: 1px solid #aaaaaa;
+  padding: 8px;
 }
 
-.set {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+#overlay-page-main {
+  padding: 8px;
+  overflow: auto;
 }
 
-.interval {
-  display: inline-block;
-  background-color: rgb(0,0,100);
-  margin-top: auto;
-  margin-bottom: auto;
+table.popup-table {
+  //border-collapse: collapse;
+  border-top: solid 1px;
+  border-bottom: solid 1px;
+  margin-top: 5px;
+  width: 100%;
 }
 
-.station {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 15px 15px 15px auto;
-  row-gap: 2px;
-  border-radius: 4px;
-  border: solid 1px rgb(0,0,100);
-  height: 100%;
-  cursor: pointer;
-  padding: 2px;
-}
-
-
-.hazard {
-  border: solid 1px rgb(0,0,100);
-}
-
-.station-name {
-  display: inline-block;
-  writing-mode: vertical-rl;
-}
 
 </style>
+<script>
+const inputSetting = [
+  {
+    "id": "text_01",
+    "type": "text",
+    "title": "文字フィルタ",
+    "size": 20,
+    "placeholder": "",
+    "default": "",
+    "newline": false
+  },
+];
+
+const overlayStyle = {
+  "version": 8,
+  "name": "Vector",
+  "metadata": {
+    "source": {
+      "my-source": {
+         "keyName": "---", //選択リストに利用するKEYとなる属性値名,
+         "title": "駅間セクション"
+       },
+      "my-source-2": {
+         "keyName": "---", //選択リストに利用するKEYとなる属性値名,
+         "title": "駅の位置"
+       },
+    }
+  },
+  "sources": {
+    'my-source': {
+      type: 'vector',
+      url: 'pmtiles://https://mghs15.github.io/flagment-inter-station/railway-section.pmtiles',
+      minzoom: 4,
+      maxzoom: 10,
+      attribution: "国土数値情報/Wikipedia"
+    },
+    'my-source-2': {
+      type: 'vector',
+      url: 'pmtiles://https://mghs15.github.io/flagment-inter-station/railway-station.pmtiles',
+      minzoom: 4,
+      maxzoom: 10,
+      attribution: "国土数値情報/Wikipedia"
+    },
+  },
+  "layers": [
+    {
+      'metadata': {
+        'isMainLayer': true
+      },
+      'id': 'my-main-layer-1',
+      'type': 'line',
+      'source': 'my-source',
+      'source-layer': 'railway',
+      'layout': {
+      'line-cap': 'round',
+        'visibility': 'visible'
+      },
+      'paint': {
+        'line-color': ['rgb', 0, 0, 255],
+        'line-opacity': 1,
+        'line-width': [
+           "case",
+           ["in", "旅客鉄道", ["get", "company"]],
+           [
+             "case",
+             ["in", "新幹線", ["get", "line"]],
+             4,
+             3
+           ],
+           2
+        ],
+      }
+    },
+    {
+      'metadata': {
+        'isMainLayer': false
+      },
+      'id': 'my-sub-layer-1-1',
+      'type': 'line',
+      'source': 'my-source',
+      'source-layer': 'railway',
+      'minzoom': 10,
+      'layout': {
+        'visibility': 'visible'
+      },
+      'paint': {
+        'line-color': ['rgb', 255, 255, 255],
+        'line-opacity': [
+           "case",
+           ["in", "旅客鉄道", ["get", "company"]],
+           1,
+           0
+        ],
+        'line-width': 2,
+        'line-dasharray': [3, 3],
+      }
+    },
+    {
+      'metadata': {
+        'isMainLayer': true
+      },
+      'id': 'my-main-layer-2',
+      'type': 'circle',
+      'source': 'my-source-2',
+      'source-layer': 'railway',
+      'layout': {
+        'visibility': 'visible'
+      },
+      'paint': {
+        'circle-color': ['rgb', 240, 240, 255],
+        'circle-opacity': 1,
+        'circle-radius': 3,
+        'circle-stroke-color': ['rgb', 0, 0, 255],
+        'circle-stroke-width': 1,
+      }
+    },
+  ]
+};
+
+</script>
+</head>
 <body>
 
 
+<div id='map'></div>
 
-<div id='note'>
-<h1 id='page-title'>全国版 ハザード付き路線図</h1>
-<strong class='strong box'>本サイトのハザード情報はあくまで目安であり、実際のリスクは各自治体のハザードマップ等を確認してください。また、単純にデータが未整備の場合や、誤りが含まれる可能性もあります。</strong>
-<br>
-本サイトは、鉄道駅のデータ（<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html" target="_blank">国土数値情報（令和4年度）</a>）から生成した代表点におけるハザード情報（<a href="https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html" target="_blank">重ねるハザードマップ</a>）に応じて色分けしたものです。
-<ul>
-<li>対象とした重ねるハザードマップのデータは、洪水浸水想定区域（想定最大規模）、高潮浸水想定区域、津波浸水想定です。</li>
-<li>駅の構造や構造物の高さ、周辺の状況は考慮していません。</li>
-<li>路線ごとの駅の順番は、国土数値情報や Wikipedia の情報をもとに生成しています。</li>
-<li>各駅をクリックすると、重ねるハザードマップへ移動します。</li>
-</ul>
+
+<div id='menutop'>
+  <div id="note">
+    <span>出典：国土数値情報、Wikipedia</span>
+  </div>
+
+<div id='menu'>
+
+  <button type="button" class="local" onclick="showFilterSetting()" ><span id="showFilterSettingMode">▼詳細設定を閉じる</span></button>
+  <div id='aco' name='aco' style="display:block;">
+  <div id="selectOverlay"></div>
+  <div id="question"></div>
+  
+  
+  <!--
+  <button type="button" class="small" onclick="openOverlayPage()" ><span>リストを表示する</span></button>
+  <button type="button" class="small" onclick="clearList()" ><span>選択したリストをクリア</span></button>
+  -->
+  <button type="button" class="small" id="switchPhotoRasterButton" ><span>地図/写真切り替え</span></button>
+  
+  <div id="infoAddCardButton" class="searchInputArea">
+    CSVデータ:<input type="file" id="addCard" onChange="addCard();">
+  </div>
+  
+  </div><!-- aco -->
+  
 </div>
 
-<div id='question'></div>
-<div id='main'></div>
+</div>
+
+
+<!-------------------------------------------------------------------------->
+
+<div id='overlay-page' name='overlay-page' style="display:none;">
+  <div id="overlay-page-header">
+    <div id="overlay-page-title">リスト</div>
+  </div>
+  <div id="overlay-page-main">
+    <div id="overlay-page-list"></div>
+  </div>
+  <div id="overlay-page-footer">
+    <button type="button" class="local" onclick="closeOverlayPage()" ><span>地図に戻る</span></button>
+  </div>
+</div>
+<!-------------------------------------------------------------------------->
 
 <script>
 
-const loadJSON = function(path){
-  
-  let data;
-  
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', path, false);
-  xhr.send(null);
-  
-  if(xhr.status == 200 || xhr.status == 304){
-    data = JSON.parse(xhr.responseText);
-  }
-  
-  return data;
-}
+/*************************************************/
+/*設定反映                                       */
+/*************************************************/
 
-const getQueryParams = () => {
-  const q = window.location.search;
-  const qq = q.slice(1);
-  const qset = qq.split("&");
-  const qobj = {};
-  qset.forEach( c => {
-    const cc = c.split("=");
-    qobj[cc[0]] = cc[1];
-  });
-  return qobj;
+const createSlider = s => {
+  
+  const formArea = document.getElementById("question");
+  
+  const slider = document.createElement("input");
+  slider.setAttribute("type", "range");
+  slider.setAttribute("id", s.id);
+  slider.setAttribute("name", s.id);
+  slider.setAttribute("min", s.min);
+  slider.setAttribute("max", s.max);
+  slider.setAttribute("value", s.default);
+  
+  slider.addEventListener("change", () => {refleshAll();} );
+  formArea.appendChild(slider);  
 }
 
 const createSelector = s => {
@@ -167,197 +345,775 @@ const createSelector = s => {
 
 }
 
-const goToHazardMap = (lng, lat, hazard) => {
-  if( !lng || !lat){
-    alert("駅情報が不足しています。")
-  }else{
-    let params = "";
-    if(hazard == "flood"){
-      params = "base=pale&ls=seamless%7Cflood_l2_keizoku%2C0.8%7Cflood_list%2C0.8%7Cflood_l1%2C0.8%7Cflood_list_l2%2C0.75%7Cdisaster1&disp=000010&vs=c1j0l0u0t0h0z0";
-    }else if(hazard == "hightide"){
-      params = "base=pale&ls=takashio_sinsuisin_raster%2C0.8%7Cdisaster3&disp=10&vs=c1j0l0u0t0h0z0";
-    }else if(hazard == "tsunami"){
-      params = "base=pale&ls=seamless%7Cekijouka_zenkoku%2C0.8%7Ctsunamishinsui_raster%2C0.8%7Cdisaster5&disp=0010&vs=c1j0l0u0t0h0z0";
-    }
-    
-    const url = `https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=${lat},${lng}&z=15&${params}`;
-    window.open(url, '_blank');
-  }
+const createTextInput = s => {
+  
+  const formArea = document.getElementById("question");
+  
+  const input = document.createElement("input");
+  input.setAttribute("type", "text");
+  input.setAttribute("id", s.id);
+  input.setAttribute("name", s.id);
+  input.setAttribute("size", s.size);
+  input.setAttribute("placeholder", s.placeholder);
+  input.setAttribute("value", s.default);
+  
+  input.addEventListener("change", () => {refleshAll();} );
+  formArea.appendChild(input);  
 }
 
-const queries = getQueryParams();
-
-const json = loadJSON(`./station-with-hazard.json`);
-
-// セレクタ生成
-
-const selecter = {
-  "id": "selecter",
-  "type": "select",
-  "title": "選択肢",
-  "list": {
-    "（鉄道事業者を選択）": ""
+inputSetting.forEach( s => {
+  //表示エリア取得
+  const formArea = document.getElementById("question");
+  
+  if(s.newline) formArea.appendChild(document.createElement("br"));
+  
+  //inputのタイトル表示
+  const title = document.createElement("span");
+  title.innerText = s.title + ":";
+  formArea.appendChild(title);
+  
+  
+  //タイプごとに入力部分の構成
+  switch(s.type){
+    case "slider":
+      createSlider(s);
+      break;
+    case "select":
+      createSelector(s);
+      break;
+    case "text":
+      createTextInput(s);
+      break;
   }
-};
-
-const companyKeys = Object.keys(json);
-const companyList = [];
-
-companyKeys.forEach( company => {
-  let companyName = company.match("旅客鉄道") ?
-    "[JR] " + company : company;
-  companyList.push(companyName);
+  
 });
 
-companyList.sort((a, b) => {
-  return a.localeCompare(b, "ja");
-}).forEach( company => {
-  selecter.list[company] = company.replace("[JR] ", "");
+
+//Sourceの数だけチェックボックスを作る。
+const appendOverlayCheckbox = (sourceId, titleText) => {
+  const formAreaSelectOverlay = document.getElementById("selectOverlay");
+  
+  const input = document.createElement("input");
+  input.setAttribute("name", "selectOverlayCheck");
+  input.setAttribute("type", "checkbox");
+  input.setAttribute("checked", "checked");
+  input.setAttribute("value", sourceId);
+  input.addEventListener("change", () => {selectOverlayLayers();} );
+  formAreaSelectOverlay.appendChild(input);  
+  
+  const title = document.createElement("span");
+  // 本来、source には metadata を記載できないため、以下の処理を修正
+  title.innerText = titleText;
+  formAreaSelectOverlay.appendChild(title);
+}
+
+for( source in overlayStyle.sources){
+  const titleText = overlayStyle.sources[source].metadata ? 
+    overlayStyle.sources[source].metadata.title : overlayStyle.metadata.source[source].title;
+  appendOverlayCheckbox(source, titleText);
+}
+
+/*************************************************/
+/*Maplibre 関係設定                              */
+/*************************************************/
+const map = new maplibregl.Map({
+  container: 'map', // container id
+  hash: true, //add #position on URL
+  style: "https://mghs15.github.io/styling-tools-for-gsi-optbv/mono.json",
+  /*
+  style: {
+    "version": 8,
+    "name": "gsimapvector",
+    "glyphs": "https://gsi-cyberjapan.github.io/optimal_bvmap/glyphs/{fontstack}/{range}.pbf",
+    "sprite": "https://gsi-cyberjapan.github.io/optimal_bvmap/sprite/std",
+    "sources": {
+        "r": {
+            "type": "raster",
+            "tiles": ["https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"],
+            "tileSize": 256,
+            "minzoom": 2,
+            "maxzoom": 18,
+            "attribution": "地理院タイル"
+        }
+    },
+    "layers": [
+        {
+            "id": "pale",
+            "type": "raster",
+            "source": "r"
+        },
+    ]
+  },*/
+  center: [139.78148, 35.768793], // starting position [lng, lat]
+  zoom: 4, // starting zoom
+  minZoom: 4,
+  maxZoom: 17.99,
+  attributionControl: false,
+  //clickTolerance: 10,
+  localIdeographFontFamily: ['MS Gothic', 'Hiragino Kaku Gothic Pro', 'sans-serif']
 });
 
-/*
-for( company in json ){
-  selecter.list[company] = company;
+
+map.addControl(new maplibregl.NavigationControl(), 'top-left');
+map.addControl(new maplibregl.ScaleControl() );
+map.addControl(new maplibregl.AttributionControl({compact: true}), 'top-right');
+
+map.showTileBoundaries = false;
+
+/*************************************************/
+/*PMTILES 関係設定                               */
+/*************************************************/
+let protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles",protocol.tile);
+
+/*************************************************/
+/*UI 関係設定                                    */
+/*************************************************/
+
+let isShowFilterSetting = true;
+
+const showFilterSetting = () => {
+  const element = document.getElementById("aco");
+  console.log(element );
+  
+  if(isShowFilterSetting ){ //閉じる作業
+    element.style.display = "none";
+    document.getElementById("showFilterSettingMode").innerText = "▲詳細設定を開く";
+  }else{ //開く作業
+    element.style.display = "block";
+    document.getElementById("showFilterSettingMode").innerText = "▼詳細設定を閉じる";
+  }
+  
+  isShowFilterSetting = !isShowFilterSetting;
+
 }
-*/
-
-createSelector(selecter);
 
 
-// 変換処理
-const toZenkaku = string => {
+/*************************************************/
+/*条件取得 関係設定                              */
+/*************************************************/
+
+const getInputValues = () => {
   
-  let ss = string
-   .replace("1", "１").replace("2", "２").replace("3", "３")
-   .replace("4", "４").replace("5", "５").replace("6", "６")
-   .replace("7", "７").replace("8", "８").replace("9", "９")
-   .replace("0", "０");
+  //選択肢をまとめて取得する
+  const res = {};
   
-  ss = ss
-   .replace("A", "Ａ").replace("B", "Ｂ").replace("C", "Ｃ")
-   .replace("D", "Ｄ").replace("E", "Ｅ").replace("F", "Ｆ")
-   .replace("G", "Ｇ").replace("H", "Ｈ").replace("I", "Ｉ")
-   .replace("J", "Ｊ").replace("K", "Ｋ").replace("L", "Ｌ")
-   .replace("M", "Ｍ").replace("N", "Ｎ").replace("O", "Ｏ")
-   .replace("P", "Ｐ").replace("Q", "Ｑ").replace("R", "Ｒ")
-   .replace("S", "Ｓ").replace("T", "Ｔ").replace("U", "Ｕ")
-   .replace("V", "Ｖ").replace("W", "Ｗ").replace("X", "Ｘ")
-   .replace("Y", "Ｙ").replace("Z", "Ｚ");
+  inputSetting.forEach( s => {
+    const id = s.id;
+    const v = "" + document.getElementById(id).value;
+    res[id] = v.replace(/&/g,"&amp;")
+      .replace(/"/g,"&quot;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/'/g, "&#39;");
+  });
   
-  return ss;
+  return res;
   
 }
 
-const h = c => {
-  const cc = (c > 1) ? c : 255;
-  return cc;
-}
-      
+/*************************************************/
+/*条件変更時の挙動 関係設定                      */
+/*************************************************/
+
 const refleshAll = () => {
   
   //好きな処理を入れる
   
   //選択肢の取得
-  const v = document.getElementById(selecter.id).value;
+  const inputValues = getInputValues();
+  console.log(inputValues);
   
-  const dataset = json[v];
+  //レイヤへのFilterを変更（sub含めて全て）
+  changeAllStyleFilters();
   
-  let mokuji = "<div id='mokuji'>";
-  let html = "";
+}
+
+const makeFilter = () => {
   
-  const lineKeys = Object.keys(dataset);
-  
-  lineKeys.sort( (a,b) => {
-    const ga = Math.max(
-      dataset[a][0].geometry.coordinates[1],
-      dataset[a][dataset[a].length -1].geometry.coordinates[1]
-    );
-    const gb = Math.max(
-      dataset[b][0].geometry.coordinates[1],
-      dataset[b][dataset[b].length -1].geometry.coordinates[1]
-    );
-    return gb - ga;
-  })
-  
-  lineKeys.forEach( line => {
-  
-    mokuji += `<a href="#${v}-${line}">${line}</a> `;
+  const inputValues = getInputValues();
     
-    const stations = dataset[line];
-    let item = `<div class='contents'>`;
+  const filter = [
+    "all"
+  ];
+  
+  if(inputValues["text_01"]){
+    const words = inputValues["text_01"].split(/(\s|　)/g);
+    console.log(words);
     
-    let isStart = true;
-    
-    stations.forEach( station => {
-      const p = station.properties;
-      
-      // 支線の分離
-      if(p.name == "_break_"){
-        item += `</div><div class='contents'>`;
-        isStart = true;
-        return;
-      }
-      
-      /* *************************** */
-      
-      item += `<div class='set'>`;
-      
-      // コネクタ
-      if(isStart){
-        item += `<div class='blank'></div>`;
-        isStart = !isStart;
-      }else{
-        item += `<div class='interval' style='height:10px;'></div>`;
-      }
-      
-      /*******
-      // 属性値に応じてコネクタを修飾する場合
-      if(p.capacity){
-        const width = p.capacity/10000;
-        item += `<div class='interval' style='height:${width}px;' title='${Math.floor(p.capacity/1000)/10}万人'></div>`;
-      }else{
-        item += `<div class='blank'></div>`;
-      }
-      *******/
-      
-      // ハザード
-      const lng = station.geometry ? station.geometry.coordinates[0] : 0;
-      const lat = station.geometry ? station.geometry.coordinates[1] : 0;
-      
-      let stationName = p.N02_005 || p.name;
-      // 縦書き時の表示のため、英数字を全角にする
-      stationName = toZenkaku(stationName);
-      
-      
-      item += `<div class='station'>
-        <div class='flood-risk hazard' title='洪水リスク' onclick='goToHazardMap(${lng},${lat},"flood");' 
-             style='background-color:rgb(${h(p["flood-r"])},${h(p["flood-g"])},${h(p["flood-b"])});'></div>
-        <div class='hightide-risk hazard' title='高潮リスク' onclick='goToHazardMap(${lng},${lat},"hightide");' 
-             style='background-color:rgb(${h(p["hightide-r"])},${h(p["hightide-g"])},${h(p["hightide-b"])});'></div>
-        <div class='tsunami-risk hazard' title='津波リスク' onclick='goToHazardMap(${lng},${lat},"tsunami");' 
-             style='background-color:rgb(${h(p["tsunami-r"])},${h(p["tsunami-b"])},${h(p["tsunami-b"])});'></div>
-        <div class='station-name' onclick='goToHazardMap(${lng},${lat});'>${stationName}</div>
-      </div>`;
-      
-      item += `</div>`; // div class:set
-      
+    const filterComp = ["any"];
+    words.forEach( word => {
+      if(word.match(/(\s|　)/)) return;
+      filterComp.push(["in", word, ["coalesce", ["get", "from"],    ""] ]);
+      filterComp.push(["in", word, ["coalesce", ["get", "to"],      ""] ]);
+      filterComp.push(["in", word, ["coalesce", ["get", "company"], ""] ]);
+      filterComp.push(["in", word, ["coalesce", ["get", "line"],    ""] ]);
     });
+    filter.push(filterComp);
+  }
+  
+  
+  console.log(filter);
+  
+  return filter;
+  
+}
+
+const changeAllStyleFilters = () =>{
+  
+  //レイヤへの処理（選択用レイヤを除く全レイヤへ）
+  overlayInfo.overlayAllLayerIdList.forEach( id => {
+    const filter = makeFilter();
+    map.setFilter(id, filter);
+    //if(filter.length > 1) map.setFilter(id, filter);
+  });
+}
+
+
+const selectOverlayLayers = () => {
+  //ソースごとの表示ON・OFF
+  const checkList = document.getElementsByName("selectOverlayCheck");
+  const checkedList = [];
+  checkList.forEach( box => {
+    console.log(box);
+    if(box.checked) checkedList.push(box.value);
+  });
+  
+  //レイヤへの処理（選択用レイヤを除く全レイヤへ）
+  overlayInfo.overlayAllLayerIdList.forEach( id => {
     
-    item += `</div>`; // div class:contents
+    const layer = map.getLayer(id);
     
-    const slide = `<div class='slide'>
-      <div class='title' id='${v}-${line}'>${v} - ${line}</div>
-      <div class='slide-main'>${item}</div>
-      <div class='footer'><strong class='strong'>※対象は洪水、高潮、津波です。データが未整備等の場合もあります。
-        <br>ハザード情報はあくまで目安であり、実際のリスクは各自治体のハザードマップ等を確認してください。</strong></div>
-    </div>`;
-    html += slide;
+    //対象レイヤのSourceがチェックされたリストに入っている。
+    if(layer.source && checkedList.includes(layer.source)){
+      map.setLayoutProperty(id, 'visibility', 'visible');
+    }else{
+      map.setLayoutProperty(id, 'visibility', 'none');
+    }
+  });
+  
+}
+
+/*************************************************/
+/*地図読み込み時の挙動 関係設定                  */
+/*************************************************/
+
+const overlayInfo = {
+  overlayKeyNames: {},
+  overlaySourceIdList: [],
+  overlayMainLayerIdList: [],
+  overlayAllLayerIdList: [] //selectは除く
+};
+
+
+map.on('load', () => {
+  
+  map.addSource('gsi-raster-seamlessphoto', {
+    'type': 'raster',
+    'tiles': ['https://cyberjapandata.gsi.go.jp/xyz/' + 'seamlessphoto' + '/{z}/{x}/{y}.jpg' ],
+    'minzoom': 2,
+    'maxzoom': 18,
+    'tileSize': 256
+  });
+  
+  map.addLayer({
+    'id': 'gsi-raster-seamlessphoto',
+    'type': 'raster',
+    'source': 'gsi-raster-seamlessphoto',
+    'layout': {
+      'visibility': 'none'
+    },
+    'paint': {}
+  });
+  
+  map.addLayer({
+    'id': 'overlay',
+    'type': 'background',
+    'paint': {
+      'background-opacity':0 
+    }
+  });
+  
+  
+  const el = document.getElementById('switchPhotoRasterButton');
+  if(el){
+    el.addEventListener("click", () => {
+      const vis =  map.getLayoutProperty('gsi-raster-seamlessphoto', 'visibility');
+      
+      if(vis == "none"){
+        map.setLayoutProperty('gsi-raster-seamlessphoto', 'visibility', 'visible');
+      }else{
+        map.setLayoutProperty('gsi-raster-seamlessphoto', 'visibility', 'none');
+      }
+    });
+  }
+  
+  
+  
+  //上乗せデータ用のsourceを順次追加
+  for( id in overlayStyle.sources){
+    map.addSource(id, overlayStyle.sources[id]);
+    overlayInfo.overlaySourceIdList.push(id);
+    // 本来、source には metadata を記載できないため、以下の処理を修正
+    overlayInfo.overlayKeyNames[id] = overlayStyle.sources[id].metadata ? 
+      overlayStyle.sources[id].metadata.keyName : overlayStyle.metadata.source[id].keyName;
+    console.log(`source ${id} を追加`);
+  }
+  
+  //上乗せデータ用のスタイルレイヤを順次追加
+  overlayStyle.layers.forEach( layer => {
+  
+    //選択時の強調用レイヤは除く
+    if(layer.metadata && layer.metadata.isSelectedLayer){
+      return;
+    }
+    
+    layer.filter = makeFilter();
+    map.addLayer(layer);
+    overlayInfo.overlayAllLayerIdList.push(layer.id);
+    //メインレイヤは別途取得
+    if(layer.metadata && layer.metadata.isMainLayer) overlayInfo.overlayMainLayerIdList.push(layer.id);
+
+    console.log(`layer "${layer.id}" を追加`);
     
   });
   
-  mokuji += `</div>`;
-  document.getElementById("main").innerHTML = mokuji + html;
+  map.addLayer({
+    'id': 'overlay-highlight',
+    'type': 'background',
+    'paint': {
+      'background-opacity':0 
+    }
+  });
+  
+  refleshAll();
+  
+});
+
+
+/*************************************************/
+/*地図クリック時の挙動 関係設定                  */
+/*************************************************/
+
+map.on('click', (e) => {
+  openPopupFunc(e);
+  orderListFunc(e);
+});
+
+
+
+//ポップアップ表示 -------------------------------
+
+const makePopupHtml = (feature) => {
+  
+  const prop = feature.properties
+  
+  let htmlString = ""; //ポップアップ
+  let featureProperties = "";
+  for(name in prop){
+    featureProperties = featureProperties + "<tr><td style='vertical-align:top; color:#555555;'>" + name + "</td>"
+                      + "<td style='color:#000000;'>" + prop[name] + "</td></tr>";
+  }
+  htmlString = htmlString + "<table class='popup-table'>" + featureProperties + "</table>";
+  
+  return htmlString;
+  
 }
+
+const popup = new maplibregl.Popup({
+  closeOnClick: false,
+});
+
+
+const openPopupFunc = (e) => {
+
+  //初期化
+  popup.remove();
+  
+  //レンダリングされた地物を取得
+  const targetLayers = overlayInfo.overlayMainLayerIdList;
+  const sv = 5;
+  const bb = [
+    [e.point.x - sv, e.point.y - sv],
+    [e.point.x + sv, e.point.y + sv]
+  ];
+  const features = map.queryRenderedFeatures(bb, {layers: targetLayers});
+  
+  if(!features.length) {
+    return;
+  } 
+  
+  //ポップアップ表示処理
+  let htmlString = "";
+  features.forEach( feature => {
+    htmlString = htmlString + makePopupHtml(feature);
+    console.log(feature.properties);
+  });
+  
+  if(!htmlString || htmlString == "") {
+    return;
+  }
+  
+  popup.setLngLat([ e.lngLat.lng, e.lngLat.lat ])
+    .setHTML(htmlString)
+    .addTo(map);
+    
+}
+
+//選択リスト追加 ----------------------------------
+const myList = {};
+const clearList = () => { 
+  for(sourceId in myList){
+    for(id in myList[sourceId]){
+      delete myList[sourceId][id];
+      refleshSelectedFeatures(sourceId);
+    }
+  }
+}
+
+const refleshSelectedFeatures = (sourceId) => {
+  
+  const selectedIdList = [];
+  for(id in myList[sourceId]){
+    selectedIdList.push(id);
+  }
+  
+  const keyName = overlayInfo.overlayKeyNames[sourceId];
+  console.log(sourceId, keyName);
+  
+  const filter = [
+    "in",
+    ["get", keyName],
+    ["literal", selectedIdList]
+  ];
+  
+  const selectedLayerId = "_my-selected-layer-" + sourceId;
+  
+  if(!map.getLayer(selectedLayerId)){
+    
+    //上乗せレイヤの中から探してくる
+    overlayStyle.layers.forEach( layer => {
+      if(layer.metadata && layer.metadata.isSelectedLayer && layer.source == sourceId){
+        layer.id = selectedLayerId;
+        layer.filter = filter;
+        console.log(selectedLayerId);
+        map.addLayer(layer, 'overlay-highlight');
+      }
+    });
+    
+  }else{
+    map.setFilter(selectedLayerId, filter)
+  }
+  
+  
+}
+
+const orderListFunc = (e) => {
+
+  //レンダリングされた地物を取得
+  const targetLayers = overlayInfo.overlayMainLayerIdList;
+  const sv = 5;
+  const bb = [
+    [e.point.x - sv, e.point.y - sv],
+    [e.point.x + sv, e.point.y + sv]
+  ];
+  const features = map.queryRenderedFeatures(bb, {layers: targetLayers});
+  
+  if(!features.length) {
+    return;
+  }
+  
+  features.forEach( feature => {
+    const sourceId = feature.source;
+    const keyName = overlayInfo.overlayKeyNames[sourceId];
+    
+    
+    //選択された地物情報をリストに追加
+    if(feature.properties[keyName]){
+      const id = feature.properties[keyName];
+      if(!myList[sourceId]) myList[sourceId] = {};
+      
+      if(!myList[sourceId][id]){
+        myList[sourceId][id] = feature;
+        refleshSelectedFeatures(sourceId);
+      }else{
+        delete myList[sourceId][id];
+        refleshSelectedFeatures(sourceId);
+        if(popup) popup.remove();
+      }
+    }
+  });
+
+}
+
+
+
+/*************************************************/
+/*オーバーレイ時の挙動 関係設定                  */
+/*************************************************/
+//別ページ表示
+const makeListHtml = (myList) => {
+
+  let listHtml = "";
+  for(sourceId in myList){
+    for(id in myList[sourceId]){
+      const f = myList[sourceId][id];
+      const prop = f.properties;
+      
+      let propHtml = "<ul>";
+      
+      for( name in props ){
+        propHtml += `<li>${name}:${props[name]}</li>`;
+      }
+      
+      propHtml += "</ul>";
+      
+      listHtml = listHtml + "<li>" + propHtml + "</li>";
+    }
+  }
+  
+  listHtml = "<ul>" + listHtml + "</ul>";
+  return listHtml;
+}
+
+const openOverlayPage = () => {
+ 
+  const pageEle = document.getElementById("overlay-page");
+  const listEle = document.getElementById("overlay-page-list");
+  
+  listEle.innerHTML = makeListHtml(myList);
+  
+  pageEle.style.display = "";
+  console.log(myList);
+ 
+}
+
+const closeOverlayPage = () => {
+ 
+  const pageEle = document.getElementById("overlay-page");
+  pageEle.style.display = "none";
+ 
+}
+
+/*************************************************/
+/*CSV アップロード 関係設定                      */
+/*************************************************/
+
+const addCard = () => {
+  console.log("add");
+  const selectedFile = document.getElementById('addCard').files[0];
+  console.log(selectedFile);
+  
+  const reader = new FileReader();
+  reader.onload = () => {
+    
+    if(!reader.result) return;
+    
+    const text = reader.result;
+    let list = text.split(/(\r\n|\n)/g).filter(f => f.match(/\S/));
+    
+    // alert("読み込み完了！");
+    
+    renderFromList(list);
+    
+  }
+  
+  reader.readAsText(selectedFile, 'shift-jis');
+}
+
+
+const renderFromList = (list) => {
+
+  let geojson = {
+    "type": "FeatureCollection",
+    "features": []
+  };
+
+  const tmp = {
+    campName: "",
+    railName: "",
+    flag: 0,
+    from: {}
+  };
+
+  //const lines = data.split("\r\n");
+  const lines = list;
+  const header = lines[0].split(",");
+
+  lines.forEach( line => {
+    
+    const c = line.split(",");
+    
+    const campName = c[0];
+    const railName = c[1];
+    const from = {
+      name: c[2],
+      lng: +c[4],
+      lat: +c[5]
+    };
+    const to = {
+      name: c[3],
+      lng: +c[6],
+      lat: +c[7]
+    };
+    
+    
+    if(!from.lng || !to.lng) return;
+    
+    const f = {
+      "type": "Feature",
+      "properties": {
+        "from": from.name,
+        "to": to.name,
+        "company": campName,
+        "line": railName,
+        
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            +from.lng,
+            +from.lat
+          ],
+          [
+            +to.lng,
+            +to.lat
+          ]
+        ]
+      }
+    };
+    
+    for( let i=8; i < header.length; i++){
+      const keyName = header[i];
+      const value = c[i];
+      if(value != ""){
+        f.properties[keyName] = value;
+      }
+    }
+    
+    geojson.features.push(f);
+    
+  });
+  
+  console.log(geojson);
+  
+  // 地図への追加
+  
+  if(map.getLayer("added-geojson")){
+    map.removeLayer("added-geojson");
+    map.removeLayer("added-geojson-sub1");
+    map.removeLayer("added-geojson-pt");
+  }
+  if(map.getSource("added-geojson")){
+    map.removeSource("added-geojson")
+  }
+  
+  map.addSource("added-geojson", {
+    type: "geojson",
+    data: geojson
+  });
+  
+  map.addLayer({
+    id: "added-geojson",
+    source: "added-geojson",
+    type: "line",
+    layout: {
+      'line-cap': 'round',
+      'line-sort-key': ["to-number", ["coalesce", ["get", "_sort-key"], 0]],
+      'visibility': 'visible'
+    },
+    paint: {
+      'line-color': [
+        "case",
+        [
+          "all",
+          ["has", "_color"],
+          ["!=", ["get", "_color"], ""],
+        ],
+        ["coalesce", ["get", "_color"], ['rgb', 255, 100, 100]],
+        [
+          "rgb",
+          ["to-number", ["coalesce", ["get", "_r"], 255]],
+          ["to-number", ["coalesce", ["get", "_g"], 100]],
+          ["to-number", ["coalesce", ["get", "_b"], 100]],
+        ]
+      ],
+      'line-opacity': ["to-number", ["coalesce", ["get", "_opacity"], 0.8]],
+      'line-width': ["to-number", ["coalesce", ["get", "_width"], 12]],
+      'line-blur': 4
+    },
+  }, "my-main-layer-1");
+
+  map.addLayer({
+    id: "added-geojson-sub1",
+    source: "added-geojson",
+    type: "line",
+    layout: {
+      'line-cap': 'round',
+      'line-sort-key': ["to-number", ["coalesce", ["get", "_sort-key"], 0]],
+      'visibility': 'visible'
+    },
+    paint: {
+      'line-color': ['rgb', 255, 255, 255],
+      'line-opacity': 1,
+      'line-width': 1,
+      'line-blur': 0.25
+    },
+  }, "my-main-layer-1");
+  
+  map.addLayer({
+    id: "added-geojson-pt",
+    source: "added-geojson",
+    type: "circle",
+    layout: {
+      'circle-sort-key': ["to-number", ["coalesce", ["get", "_sort-key"], 0]],
+      'visibility': 'visible'
+    },
+    paint: {
+      'circle-color': [
+        "case",
+        [
+          "all",
+          ["has", "_color"],
+          ["!=", ["get", "_color"], ""],
+        ],
+        ["coalesce", ["get", "_color"], ['rgb', 255, 100, 100]],
+        [
+          "rgb",
+          ["to-number", ["coalesce", ["get", "_r"], 255]],
+          ["to-number", ["coalesce", ["get", "_g"], 100]],
+          ["to-number", ["coalesce", ["get", "_b"], 100]],
+        ]
+      ],
+      'circle-opacity': 1,
+      'circle-radius': 3,
+      'circle-stroke-color': ['rgb', 0, 0, 255],
+      'circle-stroke-width': 1,
+    },
+  });
+  
+  
+  // 上乗せデータと同様の設定
+  if(!overlayInfo.overlayKeyNames["added-geojson"]){
+    
+    // チェックボックスの生成
+    const sourceId = "added-geojson";
+    const titleText = "アップロードデータ";
+    appendOverlayCheckbox(sourceId, titleText);
+    
+    // 管理用配列へ追加
+    overlayInfo.overlayKeyNames["added-geojson"] = "---";
+    overlayInfo.overlaySourceIdList.push("added-geojson");
+    overlayInfo.overlayMainLayerIdList.push("added-geojson");
+    overlayInfo.overlayAllLayerIdList.push("added-geojson");
+    overlayInfo.overlayAllLayerIdList.push("added-geojson-sub1");
+    overlayInfo.overlayAllLayerIdList.push("added-geojson-pt");
+  }
+  
+}
+
+
 
 </script>
 
