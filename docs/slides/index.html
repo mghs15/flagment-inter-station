@@ -381,7 +381,7 @@ const refleshAll = () => {
              style='background-color:${rgb.hightide};'></div>
         <div class='tsunami-risk hazard' title='津波リスク' onclick='goToHazardMap(${lng},${lat},"tsunami");' 
              style='background-color:${rgb.tsunami};'></div>
-        <div class='station-name' onclick='goToHazardMap(${lng},${lat});'>${stationName}</div>
+        <div class='station-name' onclick='goToHazardMap(${lng},${lat},"${mainHazardType}");'>${stationName}</div>
       </div>`;
       
       item += `</div>`; // div class:set
