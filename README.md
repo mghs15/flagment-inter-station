@@ -1,6 +1,8 @@
 # flagment-inter-station
 鉄道の駅間ラインデータ
 
+Blog (Qiita): https://qiita.com/mg_kudo/items/1d673a9f8d7de5ad0812
+
 ## ウェブサイト
 
 https://mghs15.github.io/flagment-inter-station/
@@ -31,6 +33,15 @@ https://mghs15.github.io/flagment-inter-station/
 	* `_r`、`_g`、`_b`：*Number* RGB をそれぞれ0～255で指定。`_color` が設定されている場合は無効。
 
 * サンプルの CSV は、本レポジトリ `sample` ディレクトリへ格納してあります。
+
+### スライド形式路線図（災害ハザード情報付）
+
+https://mghs15.github.io/flagment-inter-station/slides/
+
+* 駅の順番情報を活用し、スライド形式の路線図を作成した例です。
+* 以下のレポジトリ（３大都市圏版）の全国版となります。UI 等も改善しています。
+	* https://github.com/mghs15/railway-station-with-flood-info
+* 鉄道駅の代表点が、浸水想定図でどの程度の浸水深となるかをざっくり把握するものです。利用の際は自己責任でお願いします
 
 ## プログラム概要
 
@@ -73,6 +84,11 @@ https://mghs15.github.io/flagment-inter-station/
 	* 入力：`station-interval-flagment.geojson`、`stations.geojson`
 	* 出力：`docs/railway-section.pmtiles`、`docs/railway-station.pmtiles`
 
+#### 参考
+* hazard-slide.js
+	* 駅の順番データ通りに並び替えて、スライドをイメージしたシンプルな路線図を作ります。
+ 	* 入力：`stations-order.csv`、`stations-order-manual.csv`、[各駅の災害ハザード情報付 GeoJSON](https://github.com/mghs15/railway-station-with-flood-info/tree/main/docs)
+	* 出力：`docs/slides/station-with-hazard.json`
 
 ## 参考文献
 ### データ
@@ -88,3 +104,7 @@ https://mghs15.github.io/flagment-inter-station/
 
 * PMTiles https://github.com/protomaps/PMTiles
 * MapLibre GL JS https://github.com/maplibre/maplibre-gl-js
+
+### 災害ハザード情報
+* 重ねるハザードマップ https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/copyright/opendata.html
+	* 加工方法は、https://github.com/mghs15/railway-station-with-flood-info も参照すること
