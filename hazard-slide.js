@@ -111,6 +111,22 @@ dType.forEach( hazard => {
 });
 
 
+// チェック用
+for( compName in result ){
+  for( railName in result[compName] ){
+    result[compName][railName].forEach( s => {
+      const p = s.properties;
+      if(!p["flood-rank"] || !p["hightide-rank"] || !p["tsunami-rank"]){
+        if(p.name != "_break_"){
+          console.log(compName, railName);
+          console.log(p);
+        }
+      }
+    });
+  }
+}
+
+
 fs.writeFile(`./docs/slides/station-with-hazard.json`, JSON.stringify(result), (e) => {
   if(e){
     console.log(`ERROR: (write file)`);
