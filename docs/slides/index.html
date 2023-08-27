@@ -329,13 +329,6 @@ const refleshAll = () => {
     stations.forEach( station => {
       const p = station.properties;
       
-      // 支線の分離
-      if(p.name == "_break_"){
-        item += `</div><div class='contents'>`;
-        isStart = true;
-        return;
-      }
-      
       // 駅の重複を排除
       if(from.name == p.name){
         from.name = p.name;
@@ -343,6 +336,15 @@ const refleshAll = () => {
       }
       
       from.name = p.name;
+      
+      /* *************************** */
+      
+      // 支線の分離
+      if(p.name == "_break_"){
+        item += `</div><div class='contents'>`;
+        isStart = true;
+        return;
+      }
       
       /* *************************** */
       
