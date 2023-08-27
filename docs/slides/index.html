@@ -320,6 +320,11 @@ const refleshAll = () => {
     let item = `<div class='contents'>`;
     
     let isStart = true;
+    let from = {"name":""};
+    const bounds = [
+      [180, 85], // Southwest
+      [0, 0]  // Northeast
+    ];
     
     stations.forEach( station => {
       const p = station.properties;
@@ -330,6 +335,14 @@ const refleshAll = () => {
         isStart = true;
         return;
       }
+      
+      // 駅の重複を排除
+      if(from.name == p.name){
+        from.name = p.name;
+        return;
+      }
+      
+      from.name = p.name;
       
       /* *************************** */
       
@@ -353,15 +366,23 @@ const refleshAll = () => {
       }
       *******/
       
-      // ハザード
+      // 駅の情報
       const lng = station.geometry ? station.geometry.coordinates[0] : 0;
       const lat = station.geometry ? station.geometry.coordinates[1] : 0;
+      
+      if(lng > 0 && lat > 0){
+        bounds[0][0] = Math.min(lng, bounds[0][0]); // Southwest Lng
+        bounds[0][1] = Math.min(lat, bounds[0][1]); // Southwest Lat
+        bounds[1][0] = Math.max(lng, bounds[1][0]); // Northeast Lng
+        bounds[1][1] = Math.max(lat, bounds[1][1]); // Northeast Lat
+      }
       
       let stationName = p.N02_005 || p.name;
       // 縦書き時の表示のため、英数字を全角にする
       stationName = toZenkaku(stationName);
       
       
+      // ハザード
       const rgb = {
         "none": `rgb(255,255,255)`,
         "flood": p["flood-rank"] ? 
@@ -374,6 +395,7 @@ const refleshAll = () => {
       
       const mainHazardColor = rgb[mainHazardType];
       
+      // HTML 生成
       item += `<div class='station' style='background-color:${mainHazardColor};'>
         <div class='flood-risk hazard' title='洪水リスク' onclick='goToHazardMap(${lng},${lat},"flood");' 
              style='background-color:${rgb.flood};'></div>
